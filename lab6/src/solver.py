@@ -17,7 +17,7 @@ class Solver():
 
     def load_env(self, env):
         self.env = env
-        self.current_state, info = env.reset()
+        self.current_state, info = self.env.reset()
         self.obs_size = self.env.observation_space.n
         self.action_size = self.env.action_space.n
         self.initialize_qtable()
@@ -47,7 +47,7 @@ class Solver():
 
     def choose_action(self, explore=False, q_table=False):
         if explore:
-            if random.random() > 1 - self.eps:
+            if random.random() < 1 - self.eps:
                 action = np.argmax(self.q_table[self.current_state])  # select best action for current state (from q_table)
             else:
                 action = self.env.action_space.sample()  # selects random action for current state
@@ -74,7 +74,8 @@ class Solver():
             while not is_finished:
                 is_finished = self.train_qtable_iteration()
             if iter % 100 == 0:
-                print(f'learning iteration: {iter}')
+                pass
+                # print(f'learning iteration: {iter}')
 
     def solve(self, use_qtable=True):
         self.current_state, info = self.env.reset()
@@ -82,41 +83,58 @@ class Solver():
         episode_score = 0
 
         steps = 0
+        illegal_moves = 0
+        # print('Solving...')
         while not is_finished:
-            print(f'\n-------------------------\nSTEP: {steps+1}')
+            # print(f'\n-------------------------\nSTEP: {steps+1}')
             action = self.choose_action(q_table=use_qtable)   # select best or random action for current state (from q_table)
             step_score, next_state, is_finished = self.make_step(action)
             self.current_state = next_state
-            print(f'Action: {action}\nScore: {step_score}\n')
+            # print(f'Action: {action}\nScore: {step_score}')
             episode_score += step_score
             steps += 1
-        print(f'Is finished after {steps} steps')
-        return episode_score, steps
+            if step_score == -10:
+                illegal_moves += 1
+        # print(f'Is finished after {steps} steps')
+        return episode_score, steps, illegal_moves
 
     def evaluate(self, ev_points_count, max_iterations, episodes_count):
-        learn_iters = max_iterations/ev_points_count
-        ev_points = np.array(range(ev_points_count + 1)) * learn_iters
+        self.current_state, info = self.env.reset()
+        
+        learn_iters = int(max_iterations/ev_points_count)
+        ev_points = np.array(range(1, ev_points_count + 1)) * learn_iters
         av_scores = []
         av_steps = []
+        av_illegal_moves = []
+        print(f'Learning iterations per ev point: {learn_iters}\nStop points: {ev_points}\nEpisodes per evaluation point: {episodes_count}')
 
         # Episode 0 (random)
-        for episode in episodes_count:
-            episode_score, steps = self.solve(use_qtable=False)
-            stop_scores += episode_score
-            stop_steps += steps
-        av_scores.append(stop_scores / episodes_count)
-        av_steps.append(stop_steps / episodes_count)
+        # stop_scores = 0
+        # stop_steps = 0
+        # for episode in range(episodes_count):
+        #     print(f'Calculating at stop point: 0 (random actions)')
+        #     episode_score, steps, illegal_moves = self.solve(use_qtable=False)
+        #     stop_scores += episode_score
+        #     stop_steps += steps
+        # av_scores.append(stop_scores / episodes_count)
+        # av_steps.append(stop_steps / episodes_count)
 
         # Episodes after learning
-        for stop in ev_points_count:
+        for stop in range(ev_points_count):
+            print(f'\n=========================\nTraining data (iters {stop*learn_iters} - {(stop + 1)*learn_iters - 1})')
             self.train_qtable(learn_iters)
             stop_scores = 0
             stop_steps = 0
-            for episode in episodes_count:
-                episode_score, steps = self.solve(use_qtable=True)
+            illegal_moves = 0
+            print(f'-----------------\nCalculating average at evaluation stop: {stop}')
+            for episode in range(episodes_count):
+                episode_score, steps, illegal_move_count = self.solve(use_qtable=True)
                 stop_scores += episode_score
                 stop_steps += steps
+                illegal_moves += illegal_move_count
+                print(f'Episode {episode}: steps={steps}, score={episode_score}, ill_moves={illegal_move_count}')
+            av_illegal_moves.append(illegal_moves / episodes_count)
             av_scores.append(stop_scores / episodes_count)
             av_steps.append(stop_steps / episodes_count)
 
-        return ev_points, av_scores, av_steps
+        return ev_points, av_scores, av_steps, av_illegal_moves
