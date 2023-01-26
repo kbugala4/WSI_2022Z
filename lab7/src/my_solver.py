@@ -5,7 +5,6 @@ import numpy as np
 import operator
 from sklearn.model_selection import train_test_split
 from copy import copy
-# from sklearn.model_selection import train_test_split
 
 
 class MySolver(Solver):
@@ -24,7 +23,7 @@ class MySolver(Solver):
         self.Y_set = self.df[self.class_label]
 
     def shuffle_df(self):
-        self.df = self.df.sample(frac = 1)
+        self.df = self.df.sample(frac=1)
         self.X_set = self.df.drop(self.class_label, axis=1)
         self.Y_set = self.df[self.class_label]
 
@@ -117,6 +116,11 @@ class MySolver(Solver):
         train_acc = self.calculate_accuracy(train_prediction, Y_train)
         valid_acc = self.calculate_accuracy(valid_prediction, Y_valid)
         return train_acc, valid_acc
+
+    def evaluate_test(self, X_test, Y_test):
+        test_prediction = self.predict(X_test)
+        test_acc = self.calculate_accuracy(test_prediction, Y_test)
+        return test_acc
 
     def evaluate_cross_validation(self, X_samples, Y_samples):
         train_accs = []
